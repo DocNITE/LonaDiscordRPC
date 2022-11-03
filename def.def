@@ -1,3 +1,5 @@
 LIBRARY   LonaMouseWheel
 EXPORTS
 	update			@1
+	updateStatus    @2
+	changeVersion   @3

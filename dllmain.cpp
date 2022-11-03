@@ -1,4 +1,13 @@
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
+#define _CRT_SECURE_NO_WARNINGS
+#include <array>
+#include <cassert>
+#include <csignal>
+#include <cstdio>
+#include <cstdlib>
+#include <iostream>
+#include <thread>
+#include <vector>
 // Windows Header Files
 #include <windows.h>
 #include <stdlib.h>
@@ -10,18 +19,11 @@
 HINSTANCE   hInstance   = NULL;
 HHOOK       hkb         = NULL;
 
-
-// DISCORD EX
-#define _CRT_SECURE_NO_WARNINGS
-
-#include <array>
-#include <cassert>
-#include <csignal>
-#include <cstdio>
-#include <cstdlib>
-#include <iostream>
-#include <thread>
-#include <vector>
+using std::cout; using std::endl;
+using std::chrono::duration_cast;
+using std::chrono::milliseconds;
+using std::chrono::seconds;
+using std::chrono::system_clock;
 
 
 
@@ -70,6 +72,19 @@ enum eGameRace {
 // Dll State
 int dllState = START;
 
+// Game version
+// MAJOR = 741/1000
+// MINOR = 741/100
+// PATCH = (741/10)%10
+// BUILD = 741%10
+struct sGameVersion {
+    int MAJOR   = 0;
+    int MINOR   = 0;
+    int PATCH   = 0;
+    int BUILD   = 0;
+};
+sGameVersion gameVersion;
+
 discord::Core* core{};
 discord::Activity activity{};
 
@@ -80,17 +95,27 @@ void InitRPC()
 {
         auto result = discord::Core::Create(1037330520977195018, DiscordCreateFlags_Default, &core);
 
-        //discord::Activity activity{};
+        char versionInfo[256];
+        sprintf(versionInfo, "%d.%d.%d.%d", 
+            gameVersion.MAJOR, 
+            gameVersion.MINOR, 
+            gameVersion.PATCH,
+            gameVersion.BUILD
+        );
 
         activity.SetType(discord::ActivityType::Playing);
-        activity.SetState("");
-        activity.SetDetails("In Game");
+        activity.SetState("In Menu");
+        activity.SetDetails("");
 
-        activity.GetAssets().SetLargeImage("overkill");
-        activity.GetAssets().SetLargeText("LonaRPG");
+        activity.GetAssets().SetLargeImage("sleep");
+        activity.GetAssets().SetLargeText(versionInfo);
+
+        auto millisec_since_epoch = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+        activity.GetTimestamps().SetStart(millisec_since_epoch);
+        //activity.GetTimestamps().SetEnd(6);
 
         core->ActivityManager().UpdateActivity(activity, [](discord::Result result) {
-            activity.SetState("hey fuck");
+            //activity.SetState("hey fuck");
         });
 
         dllState = RUN;
@@ -105,27 +130,45 @@ RPC_EXPORT int update()
         InitRPC();
     case RUN:
         core->RunCallbacks();
-        //activity.SetState("hey fuck");
     default:
         return DONE;
     }
     return OK;
 }
 
+// Change version
+RPC_EXPORT void changeVersion(int ver)
+{
+    gameVersion.MAJOR = ver/1000;
+    gameVersion.MINOR = ver/100;
+    gameVersion.PATCH = (ver/10)%10;
+    gameVersion.BUILD = ver%10;
+}
+
 // Change rpc info
-/*
 RPC_EXPORT void updateStatus(int state, int lvl, int race)
 {
+    // Check if discord not run
+    if (dllState != RUN) return;
+
     if (state == MENU)
     {
+        char versionInfo[256];
+        sprintf(versionInfo, "%d.%d.%d.%d", 
+            gameVersion.MAJOR, 
+            gameVersion.MINOR, 
+            gameVersion.PATCH,
+            gameVersion.BUILD
+        );
+
         activity.SetType(discord::ActivityType::Playing);
         activity.SetState("");
         activity.SetDetails("In Menu");
 
-        activity.GetAssets().SetSmallImage("sleep");
-        activity.GetAssets().SetSmallText("LonaRPG");
+        //activity.GetAssets().SetSmallImage("sleep");
+        //activity.GetAssets().SetSmallText("LonaRPG");
         activity.GetAssets().SetLargeImage("sleep");
-        activity.GetAssets().SetLargeText("LonaRPG");
+        activity.GetAssets().SetLargeText(versionInfo);
 
         core->ActivityManager().UpdateActivity(activity, [](discord::Result result) {
 
@@ -134,40 +177,50 @@ RPC_EXPORT void updateStatus(int state, int lvl, int race)
     else if (state == GAME)
     {
         activity.SetType(discord::ActivityType::Playing);
-        const char* stateWord = "Level: " + char(lvl) + char(", Race: ");
+        char stateWord[256];
         switch (race)
         {
         case HUMAN:
-            stateWord = stateWord + char("Human");
+            sprintf(stateWord, "Level: %d, Race: Human", lvl);
+            activity.GetAssets().SetLargeImage("normal");
             break;
         case MIXED:
-            stateWord = stateWord + char("Moot");
+            sprintf(stateWord, "Level: %d, Race: Moot", lvl);
+            activity.GetAssets().SetLargeImage("normal");
             break;
         case DEEPONE:
-            stateWord = stateWord + char("Deepone");
+            sprintf(stateWord, "Level: %d, Race: Deepone", lvl);
+            activity.GetAssets().SetLargeImage("happy");
             break;
         case ABOMINATION:
-            stateWord = stateWord + char("Abomination");
+            sprintf(stateWord, "Level: %d, Race: Abomination", lvl);
+            activity.GetAssets().SetLargeImage("overkill");
             break;
         default:
-            stateWord = stateWord + char("Human");
+            sprintf(stateWord, "Level: %d, Race: Human", lvl);
+            activity.GetAssets().SetLargeImage("normal");
             break;
         }
+
+        char versionInfo[256];
+        sprintf(versionInfo, "%d.%d.%d.%d",
+            gameVersion.MAJOR,
+            gameVersion.MINOR,
+            gameVersion.PATCH,
+            gameVersion.BUILD
+        );
 
         activity.SetState(stateWord);
         activity.SetDetails("In Game");
 
-        activity.GetAssets().SetSmallImage("overkill");
-        activity.GetAssets().SetSmallText("LonaRPG");
-        activity.GetAssets().SetLargeImage("overkill");
-        activity.GetAssets().SetLargeText("LonaRPG");
+        activity.GetAssets().SetLargeText(versionInfo);
 
         core->ActivityManager().UpdateActivity(activity, [](discord::Result result) {
 
         });
     }
 }
-*/
+
 // Test function
 //RPC_EXPORT int test_value()
 //{
