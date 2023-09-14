@@ -1,0 +1,3 @@
+# LonaDiscordRPC
+It's just Discord Rich Presence for LonaRPG
+Simple mod...
